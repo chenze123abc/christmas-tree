@@ -15,6 +15,7 @@ import * as THREE from 'three';
 import { MathUtils } from 'three';
 import * as random from 'maath/random';
 import { GestureRecognizer, FilesetResolver, DrawingUtils } from "@mediapipe/tasks-vision";
+import gestureRecognizerTask from './assets/gesture_recognizer.task?url';
 
 // --- 动态生成照片列表 (top.jpg + 1.jpg 到 31.jpg) ---
 const TOTAL_NUMBERED_PHOTOS = 31;
@@ -438,7 +439,7 @@ const GestureController = ({ onGesture, onMove, onStatus, debugMode }: any) => {
         const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
         gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
           baseOptions: {
-            modelAssetPath: "./assets/gesture_recognizer.task",
+            modelAssetPath: gestureRecognizerTask,
             delegate: "GPU"
           },
           runningMode: "VIDEO",
