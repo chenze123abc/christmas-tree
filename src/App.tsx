@@ -15,7 +15,6 @@ import * as THREE from 'three';
 import { MathUtils } from 'three';
 import * as random from 'maath/random';
 import { GestureRecognizer, FilesetResolver, DrawingUtils } from "@mediapipe/tasks-vision";
-import gestureRecognizerTask from './assets/gesture_recognizer.task?url';
 
 // --- 动态生成照片列表 (top.jpg + 1.jpg 到 31.jpg) ---
 const TOTAL_NUMBERED_PHOTOS = 31;
@@ -125,8 +124,9 @@ const Foliage = ({ state }: { state: 'CHAOS' | 'FORMED' }) => {
 };
 
 // --- Component: Photo Ornaments (Double-Sided Polaroid) ---
-const PhotoOrnaments = ({ state }: { state: 'CHAOS' | 'FORMED' }) => {
-  const textures = useTexture(CONFIG.photos.body);
+const PhotoOrnaments = ({ state, customImages = [] }: { state: 'CHAOS' | 'FORMED', customImages?: string[] }) => {
+  const allImages = useMemo(() => [...customImages, ...CONFIG.photos.body], [customImages]);
+  const textures = useTexture(allImages);
   const count = CONFIG.counts.ornaments;
   const groupRef = useRef<THREE.Group>(null);
 
@@ -331,6 +331,73 @@ const FairyLights = ({ state }: { state: 'CHAOS' | 'FORMED' }) => {
   );
 };
 
+// --- Image Manager Component ---
+const ImageManager = ({ images, onAdd, onRemove }: { images: string[], onAdd: (imgs: string[]) => void, onRemove: (index: number) => void }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      const newImages: string[] = [];
+      let processedCount = 0;
+      const files = Array.from(e.target.files);
+      
+      files.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          if (ev.target?.result) {
+             newImages.push(ev.target.result as string);
+          }
+          processedCount++;
+          if (processedCount === files.length) {
+             onAdd(newImages);
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+  };
+
+  return (
+    <>
+      <div style={{ position: 'absolute', top: '20px', right: '20px', zIndex: 20 }}>
+        <button onClick={() => setIsOpen(!isOpen)} style={{ background: 'rgba(255,255,255,0.1)', color: 'white', border: '1px solid rgba(255,255,255,0.3)', padding: '8px 16px', borderRadius: '20px', cursor: 'pointer', backdropFilter: 'blur(5px)', fontSize: '14px', transition: 'all 0.3s' }}>
+          {isOpen ? 'Close Manager' : 'Manage Photos'}
+        </button>
+      </div>
+      {isOpen && (
+        <div style={{ position: 'absolute', top: '70px', right: '20px', width: '320px', maxHeight: '70vh', background: 'rgba(20, 20, 20, 0.9)', borderRadius: '16px', padding: '20px', overflowY: 'auto', zIndex: 20, border: '1px solid rgba(255,215,0,0.2)', boxShadow: '0 8px 32px rgba(0,0,0,0.5)' }}>
+          <h3 style={{ color: '#FFD700', marginTop: 0, marginBottom: '15px', fontSize: '18px', borderBottom: '1px solid rgba(255,215,0,0.2)', paddingBottom: '10px' }}>My Memories</h3>
+          
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px', marginBottom: '20px' }}>
+             {images.map((img, i) => (
+               <div key={i} style={{ position: 'relative', aspectRatio: '1', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.2)' }}>
+                 <img src={img} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                 <button onClick={() => onRemove(i)} style={{ position: 'absolute', top: '2px', right: '2px', background: 'rgba(0,0,0,0.6)', color: 'white', border: 'none', borderRadius: '50%', width: '20px', height: '20px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>×</button>
+               </div>
+             ))}
+             <div 
+               onClick={() => fileInputRef.current?.click()}
+               style={{ aspectRatio: '1', border: '2px dashed rgba(255,255,255,0.3)', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.5)', transition: 'all 0.2s' }}
+               onMouseOver={(e) => e.currentTarget.style.borderColor = '#FFD700'}
+               onMouseOut={(e) => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.3)'}
+             >
+               <span style={{ fontSize: '24px' }}>+</span>
+               <span style={{ fontSize: '10px' }}>Add</span>
+             </div>
+          </div>
+          
+          <input type="file" ref={fileInputRef} multiple accept="image/*" style={{ display: 'none' }} onChange={handleFileChange} />
+          
+          <div style={{ fontSize: '11px', color: '#888', lineHeight: '1.4', background: 'rgba(255,255,255,0.05)', padding: '10px', borderRadius: '8px' }}>
+            <span style={{ color: '#FFD700' }}>Tip:</span> Uploaded photos will be prioritized and displayed first on the tree ornaments.
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
 // --- Component: Top Star (No Photo, Pure Gold 3D Star) ---
 const TopStar = ({ state }: { state: 'CHAOS' | 'FORMED' }) => {
   const groupRef = useRef<THREE.Group>(null);
@@ -381,7 +448,7 @@ const TopStar = ({ state }: { state: 'CHAOS' | 'FORMED' }) => {
 };
 
 // --- Main Scene Experience ---
-const Experience = ({ sceneState, rotationSpeed }: { sceneState: 'CHAOS' | 'FORMED', rotationSpeed: number }) => {
+const Experience = ({ sceneState, rotationSpeed, customImages }: { sceneState: 'CHAOS' | 'FORMED', rotationSpeed: number, customImages: string[] }) => {
   const controlsRef = useRef<any>(null);
   useFrame(() => {
     if (controlsRef.current) {
@@ -407,7 +474,7 @@ const Experience = ({ sceneState, rotationSpeed }: { sceneState: 'CHAOS' | 'FORM
       <group position={[0, -6, 0]}>
         <Foliage state={sceneState} />
         <Suspense fallback={null}>
-           <PhotoOrnaments state={sceneState} />
+           <PhotoOrnaments state={sceneState} customImages={customImages} />
            <ChristmasElements state={sceneState} />
            <FairyLights state={sceneState} />
            <TopStar state={sceneState} />
@@ -439,7 +506,7 @@ const GestureController = ({ onGesture, onMove, onStatus, debugMode }: any) => {
         const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
         gestureRecognizer = await GestureRecognizer.createFromOptions(vision, {
           baseOptions: {
-            modelAssetPath: gestureRecognizerTask,
+            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/gesture_recognizer/gesture_recognizer/float16/1/gesture_recognizer.task",
             delegate: "GPU"
           },
           runningMode: "VIDEO",
@@ -510,15 +577,26 @@ export default function GrandTreeApp() {
   const [rotationSpeed, setRotationSpeed] = useState(0);
   const [aiStatus, setAiStatus] = useState("INITIALIZING...");
   const [debugMode, setDebugMode] = useState(false);
+  const [customImages, setCustomImages] = useState<string[]>([]);
+
+  const handleAddImages = (newImages: string[]) => {
+    setCustomImages(prev => [...newImages, ...prev]);
+  };
+
+  const handleRemoveImage = (index: number) => {
+    setCustomImages(prev => prev.filter((_, i) => i !== index));
+  };
 
   return (
     <div style={{ width: '100vw', height: '100vh', backgroundColor: '#000', position: 'relative', overflow: 'hidden' }}>
       <div style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, zIndex: 1 }}>
         <Canvas dpr={[1, 2]} gl={{ toneMapping: THREE.ReinhardToneMapping }} shadows>
-            <Experience sceneState={sceneState} rotationSpeed={rotationSpeed} />
+            <Experience sceneState={sceneState} rotationSpeed={rotationSpeed} customImages={customImages} />
         </Canvas>
       </div>
       <GestureController onGesture={setSceneState} onMove={setRotationSpeed} onStatus={setAiStatus} debugMode={debugMode} />
+
+      <ImageManager images={customImages} onAdd={handleAddImages} onRemove={handleRemoveImage} />
 
       {/* UI - Stats */}
       <div style={{ position: 'absolute', bottom: '30px', left: '40px', color: '#888', zIndex: 10, fontFamily: 'sans-serif', userSelect: 'none' }}>
